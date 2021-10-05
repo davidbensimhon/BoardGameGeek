@@ -1,0 +1,114 @@
+# function to grab rated collection
+# user_id: BGG username
+# return: dataframe of username, board game title, users explicit rating, board game ranking
+
+
+usersrated <- function(user_id){
+  
+  #xmlpath to all games rated by the user
+  
+  str1 = "https://boardgamegeek.com/xmlapi2/collection?username="
+  str2 = user_id
+  str3 = "&stats=1"
+  
+  fileURL <- paste(str1, str2, str3, sep = '')
+  request <- httr::GET(url = fileURL)
+  doc = XML::xmlTreeParse(request, useInternalNodes = TRUE)
+  top = XML::xmlRoot(doc)
+  
+  #selecting all games owned by the user
+  games = XML::xpathSApply(top, "//name" , XML::xmlValue)
+  
+  #testing the user has got games in his collection
+  if (length(games) == 0){
+    return(NA)
+  } else {
+    
+  #selecting ratings of games by the user
+  ratings = XML::xpathSApply(top, "//rating/@value", as.numeric, XML::xmlValue)
+  
+  #selecting board game rank
+  rankings = XML::xpathSApply(top, '//rank[1]/@value', as.numeric, XML::xmlValue)
+  
+  games_df <- as.data.frame(games)
+  ratings_df <- as.data.frame(ratings)
+  rankings_df <- as.data.frame(rankings)
+  
+  df_names <- c('Username', 'Games', 'User_Rating', 'Rankings')
+  df <- cbind(user_id, games_df, ratings_df, rankings_df)
+  colnames(df) <- df_names
+  
+  return(df)
+}}
+
+
+# function to grab board game metadata 
+# game_id: BGG game id number
+# return: dataframe of board game title, minimum players, playing time, game category, game mechanic, game artist, game designer, game publisher
+# all categorical variables will have the value of a 1 to denote their presence
+
+gamefeatures <- function(game_id){
+  
+  str1 = "https://boardgamegeek.com/xmlapi2/thing?id="
+  str2 = game_id
+  str3 = "&stats=1"
+  
+  fileURL <- paste(str1, str2, str3, sep = '')
+  request <- httr::GET(url = fileURL)
+  doc = XML::xmlTreeParse(request, useInternalNodes = TRUE)
+  top = XML::xmlRoot(doc)
+  
+  #selecting the name of the game
+  name = XML::xpathSApply(top, "//item/name[1]/@value")
+  
+  #selecting board game rank
+  rankings = XML::xpathSApply(top, '//rank[1]/@value', as.numeric, XML::xmlValue)
+  
+  #selecting minimum number of players
+  min_players = XML::xpathSApply(top,"//item/minplayers/@value")
+  
+  #selecting playing time
+  playing_time = XML::xpathSApply(top, "//playingtime/@value", as.numeric, XML::xmlValue)
+  
+  #selecting board game categories
+  categories_nodes = XML::getNodeSet(top,"//link[@type = 'boardgamecategory']")
+  categories <- lapply(categories_nodes, XML::xpathSApply, "@value")
+
+  #selecting board game mechanics
+  mechanics_nodes = XML::getNodeSet(top,"//link[@type = 'boardgamemechanic']")
+  mechanics <- lapply(mechanics_nodes, XML::xpathSApply, "@value")
+  
+  #selecting board game artist
+  artists_nodes = XML::getNodeSet(top,"//link[@type = 'boardgameartist']")
+  artists <- lapply(artists_nodes, XML::xpathSApply, "@value")
+  
+  #selecting board game designer
+  designer_nodes = XML::getNodeSet(top,"//link[@type = 'boardgamedesigner']")
+  designers <- lapply(designer_nodes, XML::xpathSApply, "@value")
+  
+  #selecting board game publisher
+  publisher_nodes = XML::getNodeSet(top,"//link[@type = 'boardgamepublisher']")
+  publishers <- lapply(publisher_nodes, XML::xpathSApply, "@value")
+  
+  #rankings
+  rankings <- as.data.frame(rankings)
+  
+  #categories <- as.data.frame(categories)
+  categories <- as.data.frame(matrix(1,nrow = 1, ncol = length(categories), dimnames = list(1,categories)), row.names = NULL)
+  
+  #mechanics <- as.data.frame(mechanics)
+  mechanics <- as.data.frame(matrix(1,nrow = 1, ncol = length(mechanics), dimnames = list(1,mechanics)), row.names = NULL)
+  
+  #artists <- as.data.frame(artists)
+  artists <- as.data.frame(matrix(1,nrow = 1, ncol = length(artists), dimnames = list(1,artists)), row.names = NULL)
+  
+  #designers <- as.data.frame(designers)
+  designers <- as.data.frame(matrix(1,nrow = 1, ncol = length(designers), dimnames = list(1,designers)), row.names = NULL)
+  
+  #publishers <- as.data.frame(publishers)
+  publishers <- as.data.frame(matrix(1,nrow = 1, ncol = length(publishers), dimnames = list(1,publishers)), row.names = NULL)
+  
+  df <- cbind(name, rankings, min_players, playing_time, categories, mechanics, artists, designers, publishers)
+  return(df)
+  
+}
