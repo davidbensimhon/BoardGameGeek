@@ -10,4 +10,4 @@ I have inlcuded code that outlines:
 4. The scraping of users game collections with ratings.
 5. The scraping of the games metadata including features such as 'min_players', 'avg_playing_time', 'mechanic', 'category' etc.
 6. The creation of Collaborative based filtering models using the 'recommenderlab' package alongside their evaluation.
-7. The creation of Content based filtering approach using user defined rules alongside its evaluation.
+7. The creation of Content based filtering system using a rule based approach.
