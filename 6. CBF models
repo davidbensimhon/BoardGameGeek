@@ -1,0 +1,99 @@
+library(recommenderlab)
+
+#read the object
+ratings <- readRDS(file = 'ratings_500_final')
+
+#remove the rankings
+ratings <- ratings[,-4]
+
+#remove duplicates
+#ratings <- ratings[!duplicated(ratings[,c("Username","Games")]),]
+
+# Convert R into realRatingMatrix data structure
+tmp_m <- reshape2::acast(ratings, Username~Games, value.var= "User_Rating", fill = NA_integer_) #pivot_wider(ratings, names_from = "Games", values_from = "User_Rating")
+
+# realRatingMatrix is a recommenderlab sparse-matrix like data-structure
+ratings_matrix <- as(tmp_m, "realRatingMatrix")
+
+# Model Creation 
+set.seed(123)
+
+mUBCF <- Recommender(data = ratings_matrix, method = "UBCF", param = list(nn=10)) #User Based Collaborative Filtering
+mIBCF <- Recommender(data = ratings_matrix,  method = "IBCF",  param = list(k=50)) #Item Based Collaborative Filtering
+mSVD <- Recommender(data = ratings_matrix,  method = "SVD", param=list(k = 10)) #Singular Value Decomposition
+mRANDOM <- Recommender(data = ratings_matrix, method = "RANDOM") #Produce random recommendations
+mPOPULAR <- Recommender(data = ratings_matrix, method = "POPULAR") #recommended games based on their popularity
+mfunkSVD <- Recommender(data = ratings_matrix, method = "SVDF", param=list(k = 10, gamma = 0.015, lambda = 0.001,
+                                                                           min_improvement = 1e-06, min_epochs = 50, max_epochs = 200,verbose = TRUE))
+mhybrid <- HybridRecommender(
+  Recommender(ratings_matrix, method = "POPULAR"),
+  Recommender(ratings_matrix, method = "SVD", param=list(k = 10)),
+  Recommender(ratings_matrix, method = "IBCF"),
+  weights = c(.2, .5, .3)
+)
+
+#save the models to load into R shiny
+save(mUBCF, ratings_matrix, file = "mubcf_model.rds")
+save(mIBCF, ratings_matrix, file = "mibcf_model.rds")
+save(mSVD, ratings_matrix, file = "msvd_model.rds")
+save(mRANDOM, ratings_matrix, file = "mrandom_model.rds")
+save(mPOPULAR, ratings_matrix, file = "mpopular_model.rds")
+save(mfunkSVD, ratings_matrix, file = "mfunksvd_model.rds")
+save(mhybrid, ratings_matrix, file = "mhybrid_model.rds")
+
+# recommended top 5 items for user zombiegod from UBCF
+recommended.items.zombiegod.UBCF <- predict(mUBCF, ratings_matrix["zombiegod"], n=10)
+# to display them
+as(recommended.items.zombiegod.UBCF, "list")
+
+
+# Evaluation
+set.seed(123)
+
+#hybrid
+weights = c(.2, .5, .3)
+recommenders = list(
+  POPULAR = list(name = 'POPULAR', param = NULL),
+  SVDf = list(name = 'SVD', param=list(k = 10)),
+  IBCF = list(name = 'IBCF', param = list(k=10))
+)
+
+set.seed(123)
+algorithms <- list(
+  "mHYBRID" = list(name = "HYBRID", param = list(recommenders = recommenders,  weights = weights)),
+  "mUBCF" = list(name = "UBCF", param = list(nn=10)),
+  "mIBCF" = list(name = "IBCF", param = list(k=10)),
+  "mSVD" = list(name = "SVD", param = list(k=10)),
+  "mfunkSVD" = list(name = "SVDF", param=list(k = 10, gamma = 0.015, lambda = 0.001,
+                                              min_improvement = 1e-06, min_epochs = 50, max_epochs = 200,
+                                              verbose = FALSE)),
+  "mPOPULAR" = list(name = "POPULAR", param=NULL),
+  "mRANDOM" = list(name = "RANDOM", param=NULL)
+)
+
+#evaluate classification accuracy
+results_topNList <- evaluate(scheme, 
+                             algorithms, 
+                             type = "topNList", 
+                             n=c(1, 3, 5, 10)
+                             )
+
+#plot TPR vs FPR
+plot(results_topNList, "ROC", annotate=c(1,6), legend="topleft")
+
+
+#plot precision vs recall
+plot(results_topNList, "prec/rec", annotate=4, legend="bottomright")
+
+#evaluate predictive accuracy
+results_ratings <- evaluate(scheme, 
+                            algorithms, 
+                            type = "ratings"
+                            )
+
+#plot RMSE, MSE, MAE
+plot(results_ratings, 
+     ylim = c(0,4),
+     col = c('skyblue', 'skyblue4', 'royalblue', 'navy', 'grey', 'white', 'beige')
+     )
+
