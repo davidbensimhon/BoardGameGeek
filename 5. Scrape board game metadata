@@ -1,0 +1,14 @@
+# load top 500 board game ids
+top_500_ids <- readRDS(file = "top_500_ids")
+
+# initialize collection
+top_500_content = gamefeatures(top_500_ids[1])
+
+#loop through each game and add their metadata to a data frame
+for (i in 2:length(top_500_ids)){
+  top_500_content = plyr::rbind.fill(top_500_content, gamefeatures(top_500_ids[i]))
+  Sys.sleep(2)
+}
+
+# scale playing time as not to bear too much influence on the model
+top_500_content$playing_time <- scales::rescale(top_500_content$playing_time, to=c(0,1))  
