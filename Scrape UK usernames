@@ -1,0 +1,30 @@
+library(tidyverse)
+
+## To grab the collection of all BGG members in the UK
+
+# File URL broken down into parts for to allow for changing the pages
+str1 = "https://www.boardgamegeek.com/users/page/"
+str2 = "?country=United%20Kingdom&state=&city="
+last_page <- 3903
+
+#initialize usernames
+UK_users <- c()
+
+#loop through the pages and grab the user ids
+for (i in 1:last_page){
+  fileURL <- paste(str1, i, str2, sep = '')
+  UK_users[i] <- rvest::read_html(fileURL) %>%
+    rvest::html_nodes("div[class='username']") %>%
+    rvest::html_text() %>%
+    qdapRegex::rm_bracket(extract = TRUE, trim = FALSE) %>%
+    unlist() %>%
+    as.data.frame()
+}
+
+UK_users <- readRDS(file = "usernames.rds")
+
+# manually input first username that appeared as NA
+UK_users[[1]][1]<- 'zombiegod'
+
+# convert lists into a single vector
+vector_of_UK_usernames <- unlist(UK_users)
