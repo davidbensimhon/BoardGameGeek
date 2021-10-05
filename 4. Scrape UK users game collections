@@ -1,0 +1,89 @@
+# initialize collections
+UK_user = c()
+
+# to handle white spaces we replace them with '%20" as needed per the website API
+for (i in vector_of_UK_usernames) {
+  searchString <- ' '
+  replacementString <- '%20'
+  UK_user[i] = gsub(searchString, replacementString,i)
+}
+
+# initialize the collection
+UK_collection_part_1 = usersrated(UK_user[1])
+
+# loop through each user and add their collection to a dataframe removing users that have no games in their collection 
+for (i in 1:length(UK_user)){
+  user_data = usersrated(UK_user[i])
+  if (!is.na(user_data)){
+    UK_collection_part_1 = rbind(UK_collection_part_1, usersrated(UK_user[i]))
+    Sys.sleep(2)
+  }
+}
+
+# this was performed 11 times over 3 days to retreive all the data
+
+# to identify where to start the next scrape
+match('Francis Drake', top_500_names)
+
+UK_collection_all <- rbind(UK_collection_part_1, UK_collection_part_2, UK_collection_part_3, UK_collection_part_4, UK_collection_part_5, UK_collection_part_6, UK_collection_part_7, UK_collection_part_8, UK_collection_part_9, UK_collection_part_10, UK_collection_part_11)
+
+# remove duplicates if necessary
+UK_collection_all <- UK_collection_all[!duplicated(UK_collection_all[,c("Username","Games")]),]
+
+# count usernames
+dplyr::n_distinct(UK_collection_500$Username)
+
+# set ratings variable
+ratings_a <- UK_collection_all
+
+# remove duplicates if necessary
+ratings_a <- ratings_a[!duplicated(ratings_a[,c("Username","Games")]),]
+
+# include only games that are in the top 550 list (we use the top 550 games as the ranked lists gets updated)
+ratings_a <- ratings_a[ratings_a$Rankings <=550,]
+
+# get game names of top 500 as when we scraped our features dataset
+top_500_names <- readRDS(file = "top_500_names")
+
+# include only games that are in the top 500 list according to our features dataset
+ratings_a <- ratings_a[ratings_a$Games %in% top_500_names$top_500_names,]
+
+# number of distinct users - 22331
+dplyr::n_distinct(ratings_a$Username)
+
+# spread of how many games are in the users collections
+games_sum = ratings_a %>%
+  group_by(Username) %>%
+  count() 
+
+summary(games_sum$n)
+
+# remove all users that do not own at least 10 games
+game_index = games_sum$Username[games_sum$n>10]
+ratings_a = ratings_a[ratings_a$Username %in% game_index, ]
+
+#spread of how many games are in the updated collections
+games_sum = ratings_a %>%
+  group_by(Username) %>%
+  count() 
+
+summary(games_sum$n)
+
+# number of distinct users - 9583
+dplyr::n_distinct(ratings_a$Username)
+
+# missing ratings per user
+missing_ratings <- ratings_a %>% group_by(Username) %>% summarise(NA_sum = sum(is.na(User_Rating)))
+ratio <- c()
+
+for (i in 1:length(games_sum)){
+  rated_games_ratio = round(((games_sum$n - missing_ratings$NA_sum)/(games_sum$n)), 2)
+  ratio = cbind(missing_ratings$Username, rated_games_ratio)
+}
+
+ratio <- as.data.frame(ratio)
+
+# locate users that have rated at least 15% of their collection
+# remove these users as little to no valuable information can be inferred from them
+rating_index <- ratio$V1[ratio$rated_games_ratio > 0.15]
+ratings_final = ratings_a[ratings_a$Username %in% rating_index,]
