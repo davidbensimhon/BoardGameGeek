@@ -1,0 +1,60 @@
+library(tidyverse)
+
+str1 = "https://boardgamegeek.com/browse/boardgame/page/"
+board_game_ids <- c()
+board_games_names <- c()
+
+for (i in 1:5){
+  fileURL <- paste(str1, i, sep = '')
+  boardgames_html <- readLines(fileURL)
+  boardgame_line <- grep('<img', boardgames_html)
+  link_list <- boardgames_html[boardgame_line]
+  
+  #extract the board game id
+  game_id <- link_list %>%
+    gsub('\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\\[<a href=\"/boardgame/', '', .) %>%
+    gsub('/marketplace/geekmarket\">Shop</a>]', '', .)
+  game_id <- unlist(strex::str_first_number(game_id))
+  
+  #extract the board game name and image
+  game_name <- sapply(stringi::stri_split(link_list , regex = 'alt=\"'),"[",2)
+  
+  game_image <- sapply(stringi::stri_split(game_name , regex = 'src=\"'),"[",2)
+  
+  game_name <- sapply(stringi::stri_split(game_name , regex = 'src=\"'),"[",1)
+  
+  game_name <- gsub('Board Game: ', '', game_name)
+  
+  game_name <- sapply(stringi::stri_split(game_name , regex = '\"'),"[",1)
+  
+  game_image <- gsub('></a', '', game_image) %>% gsub('">',"",.)
+  
+  #download board game images to a new folder called images
+  sapply(2:length(game_id), function(j){
+  download.file(url = game_image[j],destfile = paste0("images/",game_id[j],".jpg"))
+  })
+  
+  board_game_ids <- c(board_game_ids,game_id)
+  game_name <- setNames(game_name, game_id)
+  board_games_names <- c(board_games_names, game_name) #save and load to get images into R shiny
+}
+
+# clean up
+board_game_ids <- as.data.frame(board_game_ids)
+top_500_ids <- board_game_ids[board_game_ids$board_game_ids>0,]
+
+board_games_names <- as.data.frame(board_games_names)
+top_500_names <- board_games_names[!is.na(board_games_names)]
+
+top_500_names <- as.data.frame(top_500_names)
+
+#remove special characters such as BÃ¤renpark
+top_500_names[25,] <- 'Orléans'
+top_500_names[244,] <- 'Exit: The Game – The Abandoned Cabin'
+top_500_names[297,] <- 'Bärenpark'
+top_500_names[315,] <- 'Gùgōng'
+top_500_names[371,] <- 'Dice Throne: Season Two – Battle Chest'
+top_500_names[405,] <- 'Labyrinth: The War on Terror, 2001 – ?'
+top_500_names[438,] <- 'Exit: The Game – Dead Man on the Orient Express'
+top_500_names[466,] <- 'Pathfinder Adventure Card Game: Rise of the Runelords – Base Set'
+top_500_names[471,] <- 'Star Wars: X-Wing Miniatures Game – The Force Awakens Core Set'
