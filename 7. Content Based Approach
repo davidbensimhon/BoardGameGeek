@@ -1,0 +1,93 @@
+Inspiration for this code can be attributed to Ander Fernandez.
+    title = {{How to code a recommendation system in R}},
+    year = {2019},
+    author = {Fernandez, Ander},
+    url = {https://anderfernandez.com/en/blog/how-to-code-a-recommendation-system-in-r/}
+
+library(cluster)
+library(tidyverse)
+library(tidyr)
+
+ratings <- readRDS(file = 'ratings_500_final')
+top_500_content <-readRDS(file = 'top_500_content')
+top_500_ids <-readRDS(file = 'top_500_ids')
+top_500_names <-readRDS(file = 'top_500_names')
+
+#wrangling to swap game names with game id
+top_500_ids <- as.data.frame(top_500_ids)
+
+#create named list of game ids and game names
+id_name <- setNames(top_500_ids$top_500_ids, top_500_names$top_500_names)
+name_id <- setNames(top_500_names$top_500_names, top_500_ids$top_500_ids)
+
+#swap game names with game ids as when working with matrices it is easier to work without special characters such as /'-''
+top_500_content[,1] <- top_500_ids$top_500_ids
+ratings[,2] <- id_name[ratings[,2]]
+
+#remove ranking variable
+top_500_games <- top_500_content[,-2]
+
+#as we will be transforming matrices later on to avoid R including a number before the row names
+top_500_games$name = paste0("game.", top_500_games$name)
+ratings$Games = paste0("game.", ratings$Games)
+
+#convert to factors
+top_500_games$name <- as.factor(top_500_games$name)
+top_500_games$min_players <- as.factor(top_500_games$min_players)
+
+#create a dissimilarity matrix for our games
+dissimilarity = daisy(top_500_games, metric = "euclidean")
+dissimilarity = as.matrix(dissimilarity)
+
+#add the games to the row/column names - to deal with the special characters
+row.names(dissimilarity)<- top_500_games$name[1:500]
+colnames(dissimilarity)<- rownames(dissimilarity)
+
+#find the games a user has rated and rank them from high to low
+user_games = ratings %>%
+  filter(Username == user_id & Games %in% top_500_games$name) %>%
+  arrange(desc(User_Rating))
+
+owned_games = user_games[ ,c("Games", "User_Rating")]
+
+content_based_recommender = function(owned_games, dissimilarity_matrix, 
+                                     top_500_games, n_recommendations){
+  
+  # takes the user owned games and subset the dissimilarity matrix
+  owned_games_indexes = which(colnames(dissimilarity_matrix) %in% owned_games$Games)
+  
+
+  results = data.frame(dissimilarity_matrix[, owned_games_indexes], # dim should be top m games by the n owned games
+                       recommended_game = row.names(dissimilarity_matrix), #  should be top m games
+                       stringsAsFactors = FALSE) # dim should be m by n+1
+
+  # get the top n recommended games
+  recommendations = results %>%
+    pivot_longer(cols = c(-"recommended_game") , names_to = "owned_game", 
+                 values_to = "dissimilarity") %>%
+    left_join(owned_games, by = c("owned_game" = "Games"))%>% # joins the rating value for each owned game
+    filter(!recommended_game %in% owned_games$Games) %>% # filter out the owned games from the recommended
+    filter(!is.na(User_Rating) ) %>% # filter owned games without rating
+    arrange(desc(dissimilarity)) %>%
+    mutate(
+      similarity = 1 - dissimilarity,
+      weighted_score = similarity * User_Rating) %>%
+    filter(weighted_score>0) %>%
+    group_by(recommended_game) %>% 
+    arrange(desc(weighted_score)) %>% 
+    slice(1) %>%
+    ungroup() %>% 
+    group_by(owned_game) %>%
+    slice(2) %>%
+    ungroup() %>%
+    top_n(n_recommendations, weighted_score) %>%  
+    arrange(desc(weighted_score))
+  
+  #return(recommendations)
+  x = pull(recommendations, var = 1)
+  ids_for_rec = gsub('.*\\.',"",x)
+  game_for_rec = name_id[paste(ids_for_rec, sep = '')]
+
+  return(game_for_rec)
+  
+}
