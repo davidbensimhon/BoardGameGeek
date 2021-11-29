@@ -11,3 +11,4 @@ I have inlcuded code that outlines:
 5. The scraping of the games metadata including features such as 'min_players', 'avg_playing_time', 'mechanic', 'category' etc.
 6. The creation of Collaborative based filtering models using the 'recommenderlab' package alongside their evaluation.
 7. The creation of Content based filtering system using a rule based approach.
+8. The creation of a dashboard in R shiny to enable the user to view their results.
