@@ -1,0 +1,177 @@
+library(shiny)
+library(DT)
+library(shinydashboard)
+library(recommenderlab)
+
+
+ui <- fluidPage(
+    headerPanel('Board Game Recommender System'),
+    sidebarPanel('Lets find your next game!',
+
+                          selectizeInput(inputId = "id", label = "", choices = NULL,
+                                         options = list(placeholder = "Type player username")) ,               
+                   selectInput("variable", "Select a recommender System:",
+                             c("User Based Collaborative Filtering" = "ubcf",
+                               "Item Based Collaborative Filtering" = "ibcf",
+                               "Content Based Filtering" = "cbf" ,
+                               "Singular Value Decomposition" = 'svd', 
+                               "Hybrid" = 'hybrid', 
+                               "Popular Model" = 'popular', 
+                               "Random Recommendation" = 'random'
+                             )),
+                 actionButton("submit", "Submit", icon("Submit") , 
+                              width = NULL, style="color: #fff; background-color: #337ab7; border-color: #2e6da4")),
+    mainPanel(
+        DT::DTOutput("data"),
+        DT::DTOutput("info")
+    )
+)
+
+#textInput(inputId = 'id', label = "Please enter your BGG username: "),
+
+server <- function(input, output, session){
+
+    load("top_500_games_ids.rda")
+    #wrangling to swap game names with game id
+    top_500_ids <- as.data.frame(top_500_ids)
+    
+    #create named list of game ids and game names
+    id_name <- setNames(top_500_ids$top_500_ids, top_500_names$top_500_names)
+    
+    name_id <- setNames(top_500_names$top_500_names, top_500_ids$top_500_ids)
+    
+    usernames <- readRDS(file = 'usernames.rds')
+    
+    updateSelectizeInput(session, "id",
+                         choices = as.vector(usernames), server = TRUE)
+    
+    observeEvent(input$submit, {
+        
+        if(input$variable=="ubcf"){
+            
+            load("mubcf_model.rds")
+            recommended.items <- predict(mUBCF, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+        }
+        
+        if(input$variable=="ibcf"){
+            
+            load("mibcf_model.rds")
+            recommended.items <- predict(mIBCF, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+        }
+        
+        if(input$variable=="svd"){
+            
+            load("msvd_model.rds")
+            recommended.items <- predict(mSVD, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+        }
+        
+        if(input$variable=="popular"){
+            
+            load("mpopular_model.rds")
+            recommended.items <- predict(mPOPULAR, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+        }
+        
+        
+        if(input$variable=="random"){
+            
+            load("mrandom_model.rds")
+            recommended.items <- predict(mRANDOM, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+            
+        }
+        
+        
+        if(input$variable=="cbf"){
+            load("CB_recommender.rds")
+            user_games = ratings %>%
+                filter(Username == input$id & Games %in% top_500_games$name)
+            owned_games = user_games[ ,c("Games", "User_Rating")]
+            recommendations = content_based_recommender(owned_games, dissimilarity, top_500_games, 5)
+            recommendations <- unname(recommendations)
+            recommended.items <- as.data.frame(recommendations)
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+            
+        }
+        if(input$variable=="hybrid"){
+            
+            load("mhybrid_model.rds")
+            recommended.items <- predict(mhybrid, ratings_matrix[input$id], n=5)
+            recommended.items <- as.data.frame(as(recommended.items, "list"))
+            recommended.items$icon <- sapply(recommended.items[[1]], function(i){
+              paste0(
+                '<img src="',id_name[i],'.jpg" height="52"></img>'
+              )
+            })
+            output$data <- DT::renderDataTable({DT::datatable(recommended.items, escape = F)})
+            load("insight_table.rds")
+            output$info <- DT::renderDataTable(insight_table)
+            
+            
+        }
+        
+    })
+    
+    
+}
+
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+
